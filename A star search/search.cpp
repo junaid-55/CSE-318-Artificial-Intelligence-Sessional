@@ -248,6 +248,18 @@ bool is_already_explored(vector<node *> &close, node *trial_node)
     }
     return false;
 }
+bool isGoal(Config &config)
+{
+    int k = config.k;
+    for (int i = 0; i < k; i++)
+        for (int j = 0; j < k; j++)
+        {
+            int target = i * k + j + 1;
+            if (target % (k * k) != config.board[i][j])
+                return false;
+        }
+    return true;
+}
 
 pair<node *, pair<int, int>> easter_algo(Config &init, Heuristic heuristic)
 {
@@ -255,12 +267,12 @@ pair<node *, pair<int, int>> easter_algo(Config &init, Heuristic heuristic)
     priority_queue<node *, vector<node *>, Comparator> open;
     open.push(start);
     vector<node *> closed;
-    int explored = 0, expanded = 0;
+    int explored = 1, expanded = 0;
     while (!open.empty())
     {
         node *current = open.top();
         open.pop();
-        if (heuristic(current->config) == 0)
+        if (isGoal(current->config))
         {
             ans = current;
             break;
