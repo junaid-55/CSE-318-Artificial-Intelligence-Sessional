@@ -48,7 +48,7 @@ process_file() {
         flock -x 200
         echo "G$idx,$data" >> "$output_file"
     } 200>>.csv.lock
-}
+}k
 
 export -f process_file
 export output_file
