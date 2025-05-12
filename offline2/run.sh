@@ -2,14 +2,14 @@
 
 g++ -o test main.cpp || exit 1
 
-output_file="report1.csv"
+output_file="report.csv"
 echo "Name,|V| or n,|E| or m,\"Constructive Algorithm: Simple Randomized or Randomized-1\",\"Constructive Algorithm: Simple Greedy or Greedy-1\",\"Constructive Algorithm: Semi-greedy-1\",\"Local Search: No. of iterations\",\"Local Search: Average value\",\"GRASP: No. of iterations\",\"GRASP: Best value\",\"Known best solution or upper bound\"" > "$output_file"
 
 max_idx_to_process=2
 
 process_file() {
     local idx="$1"
-    local current_processing_file="./input/g${idx}.rud"
+    local current_processing_file="./input/g${idx}.txt"
     local v_count
     local test_arg1
     local test_arg2
