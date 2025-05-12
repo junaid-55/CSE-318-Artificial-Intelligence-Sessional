@@ -3,8 +3,12 @@
 #include <cstdlib>
 #include <ctime>
 #include <set>
+#include <map>
+#include <algorithm>
 #include <cstring>
 using namespace std;
+const map<string, int> knownBest = {
+    {"G1", 12078}, {"G2", 12084}, {"G3", 12077}, {"G11", 627}, {"G12", 621}, {"G13", 645}, {"G14", 3187}, {"G15", 3169}, {"G16", 3172}, {"G22", 14123}, {"G23", 14129}, {"G24", 14131}, {"G32", 1560}, {"G33", 1537}, {"G34", 1541}, {"G35", 8000}, {"G36", 7996}, {"G37", 8009}, {"G43", 7027}, {"G44", 7022}, {"G45", 7020}, {"G48", 6000}, {"G49", 6000}, {"G50", 5988}};
 
 int cutWeight(set<int> &x, set<int> &y, vector<vector<int>> &weight)
 {
@@ -28,7 +32,7 @@ int cutWeight(pair<set<int>, set<int>> &solution, vector<vector<int>> &weight)
 
 pair<int, int> maxWeightEdge(vector<vector<int>> &list, vector<vector<int>> &weight)
 {
-    int max_w = -1, max_u, max_v;
+    int max_w = -INT_MAX, max_u, max_v;
     for (int i = 1; i < list.size(); i++)
     {
         if (list[i].empty())
@@ -65,23 +69,34 @@ int delta(int v, set<int> &before, set<int> &after, vector<vector<int>> &weight)
     return value;
 }
 
-double RandomizedMaxCut(vector<vector<int>> &list, vector<vector<int>> &weight, int numIterations)
+pair<set<int>, set<int>> RandomizedMaxCut(vector<vector<int>> &list, vector<vector<int>> &weight)
+{
+
+    set<int> x, y;
+    for (int v = 1; v < list.size(); v++)
+    {
+        if (rand() % 2 == 0)
+            x.insert(v);
+        else
+            y.insert(v);
+    }
+
+    return {x, y};
+}
+
+double call_RandomizedMaxCut(vector<vector<int>> &list, vector<vector<int>> &weight, int numIterations)
 {
     long long int totalCutWight = 0;
     for (int i = 1; i <= numIterations; i++)
     {
         set<int> x, y;
-        for (int v = 1; v < list.size(); v++)
-        {
-            if (rand() % 2 == 0)
-                x.insert(v);
-            else
-                y.insert(v);
-        }
+        auto ans = RandomizedMaxCut(list, weight);
+        x = ans.first;
+        y = ans.second;
         int cut_weight = cutWeight(x, y, weight);
         totalCutWight += cut_weight;
     }
-    return 1.0 * totalCutWight / numIterations;
+    return (double)totalCutWight / numIterations;
 }
 
 pair<set<int>, set<int>> GreedyMaxCut(vector<vector<int>> &list, vector<vector<int>> &weight)
@@ -199,12 +214,16 @@ pair<set<int>, set<int>> LocalSearch(set<int> &x, set<int> &y, vector<vector<int
     return {x, y};
 }
 
-double call_local_search(int numIterations, vector<vector<int>> &list, vector<vector<int>> &weight)
+double call_local_search(int numIterations, vector<vector<int>> &list, vector<vector<int>> &weight, string init_soln_type = "Semi_Greedy", double alpha = 0.8)
 {
     double total_value = 0;
     for (int i = 1; i <= numIterations; i++)
     {
-        auto initial_soln = SemiGreedyMaxCut(list, weight, 0.5);
+        pair<set<int>, set<int>> initial_soln;
+        if (init_soln_type == "Semi_Greedy")
+            initial_soln = SemiGreedyMaxCut(list, weight, alpha);
+        else
+            initial_soln = RandomizedMaxCut(list, weight);
         auto x = initial_soln.first, y = initial_soln.second;
         auto ans = LocalSearch(x, y, weight);
         total_value += cutWeight(ans.first, ans.second, weight);
@@ -212,12 +231,12 @@ double call_local_search(int numIterations, vector<vector<int>> &list, vector<ve
     return total_value / numIterations;
 }
 
-int GRASP(int numIterations, vector<vector<int>> &list, vector<vector<int>> &weight)
+int GRASP(int numIterations, vector<vector<int>> &list, vector<vector<int>> &weight, double alpha = 0.8)
 {
     set<int> x, y;
     for (int i = 1; i <= numIterations; i++)
     {
-        auto new_soln = SemiGreedyMaxCut(list, weight, 0.5);
+        auto new_soln = SemiGreedyMaxCut(list, weight, alpha);
         new_soln = LocalSearch(new_soln.first, new_soln.second, weight);
         if (i == 1 || cutWeight(new_soln.first, new_soln.second, weight) > cutWeight(x, y, weight))
             x = new_soln.first, y = new_soln.second;
@@ -228,7 +247,7 @@ int GRASP(int numIterations, vector<vector<int>> &list, vector<vector<int>> &wei
 int main(int argc, char **args)
 {
     srand(time(0));
-    // freopen(args[1], "r", stdin);
+    freopen(args[1], "r", stdin);
 
     int n, m;
     cin >> n >> m;
@@ -252,46 +271,52 @@ int main(int argc, char **args)
     {
         cout << n << "," << m << ",";
         auto simple_greedy = GreedyMaxCut(list, weight);
-        cout << RandomizedMaxCut(list, weight, 30) << ","
+        cout << call_RandomizedMaxCut(list, weight, 30) << ","
              << cutWeight(simple_greedy, weight) << ",";
         auto semi_greedy = SemiGreedyMaxCut(list, weight, stod(args[3]));
         cout << cutWeight(semi_greedy, weight) << "," << args[4] << ","
-             << call_local_search(atoi(args[4]), list, weight) << "," << args[5] << ","
-             << GRASP(atoi(args[5]), list, weight) << endl;
+             << call_local_search(atoi(args[4]), list, weight, "Simple_Random") << "," << args[5] << ","
+             << GRASP(atoi(args[5]), list, weight, stod(args[3])) << endl;
     }
     else if (strcmp(args[2], "Simple_Random") == 0)
     {
-        auto simple_random = RandomizedMaxCut(list, weight, atoi(args[3]));
+        auto simple_random = call_RandomizedMaxCut(list, weight, atoi(args[3]));
         cout << "|V| : " << n << endl
-             << "|E|: " << m << endl
+             << "|E| : " << m << endl
              << "ANSWER : " << simple_random << endl;
     }
     else if (strcmp(args[2], "Simple_Greedy") == 0)
     {
         auto simple_greedy = GreedyMaxCut(list, weight);
         cout << "|V| : " << n << endl
-             << "|E|: " << m << endl
+             << "|E| : " << m << endl
              << "ANSWER : " << cutWeight(simple_greedy, weight) << endl;
     }
-    else if (strcmp(args[2], "Semi_greedy") == 0)
+    else if (strcmp(args[2], "Semi_Greedy") == 0)
     {
         auto semi_greedy = SemiGreedyMaxCut(list, weight, stod(args[3]));
         cout << "|V| : " << n << endl
-             << "|E|: " << m << endl
+             << "|E| : " << m << endl
              << "ANSWER : " << cutWeight(semi_greedy, weight) << endl;
     }
     else if (strcmp(args[2], "Local_Search") == 0)
     {
-        auto local_search = call_local_search(atoi(args[3]), list, weight);
+        double local_search;
+        if (argc == 6)
+            local_search = call_local_search(atoi(args[3]), list, weight, args[4], stod(args[5]));
+        else if (argc == 5)
+            local_search = call_local_search(atoi(args[3]), list, weight, args[4]);
+        else
+            local_search = call_local_search(atoi(args[3]), list, weight);
         cout << "|V| : " << n << endl
-             << "|E|: " << m << endl
+             << "|E| : " << m << endl
              << "ANSWER : " << local_search << endl;
     }
     else if (strcmp(args[2], "GRASP") == 0)
     {
         auto grasp = GRASP(atoi(args[3]), list, weight);
         cout << "|V| : " << n << endl
-             << "|E|: " << m << endl
+             << "|E| : " << m << endl
              << "ANSWER : " << grasp << endl;
     }
 }
