@@ -43,55 +43,108 @@ public:
         grid = other.grid;
     }
 
-#include <queue>
+    void insert_orb(int row, int col, char color, bool force = false)
+    {
+        queue<pair<int, int>> explosion_queue;
+        set<pair<int, int>> in_queue; // Track cells already in queue
 
-  void insert_orb(int row, int col, char color, bool force = false)
-{
-    queue<pair<int, int>> explosion_queue;
-    set<pair<int, int>> in_queue; // Track cells already in queue
-    
-    explosion_queue.push({row, col});
-    in_queue.insert({row, col});
-    
-    while (!explosion_queue.empty()) {
-        auto front = explosion_queue.front();
-        int r = front.first;
-        int c = front.second;
-        explosion_queue.pop();
-        in_queue.erase({r, c}); // Remove from tracking set
-        
-        if (r < 0 || r >= rows || c < 0 || c >= cols) {
-            continue;
-        }
-        
-        Cell &cell = grid[r][c];
-        if (cell.get_color() == ' ' || cell.get_color() == color || force) {
-            cell.set_orb_count(cell.get_orb_count() + 1);
-            cell.set_color(color);
-        }
+        explosion_queue.push({row, col});
+        in_queue.insert({row, col});
 
-        if (cell.get_orb_count() >= get_critical_mass(r, c)) {
-            cell.set_orb_count(0);
-            cell.set_color(' ');
-            
-            int dx[4] = {-1, 0, 1, 0};
-            int dy[4] = {0, 1, 0, -1};
-            
-            for (int i = 0; i < 4; i++) {
-                int new_row = r + dx[i];
-                int new_col = c + dy[i];
-                pair<int, int> next_cell = {new_row, new_col};
-                
-                // Only add to queue if not already present
-                if (in_queue.find(next_cell) == in_queue.end()) {
-                    explosion_queue.push(next_cell);
-                    in_queue.insert(next_cell);
+        while (!explosion_queue.empty())
+        {
+            auto front = explosion_queue.front();
+            int r = front.first;
+            int c = front.second;
+            explosion_queue.pop();
+            in_queue.erase({r, c}); // Remove from tracking set
+
+            if (r < 0 || r >= rows || c < 0 || c >= cols)
+            {
+                continue;
+            }
+
+            Cell &cell = grid[r][c];
+            if (cell.get_color() == ' ' || cell.get_color() == color || force)
+            {
+                cell.set_orb_count(cell.get_orb_count() + 1);
+                cell.set_color(color);
+            }
+
+            if (cell.get_orb_count() >= get_critical_mass(r, c))
+            {
+                cell.set_orb_count(0);
+                cell.set_color(' ');
+
+                int dx[4] = {-1, 0, 1, 0};
+                int dy[4] = {0, 1, 0, -1};
+
+                for (int i = 0; i < 4; i++)
+                {
+                    int new_row = r + dx[i];
+                    int new_col = c + dy[i];
+                    pair<int, int> next_cell = {new_row, new_col};
+
+                    // Only add to queue if not already present
+                    if (in_queue.find(next_cell) == in_queue.end())
+                    {
+                        explosion_queue.push(next_cell);
+                        in_queue.insert(next_cell);
+                    }
                 }
             }
         }
     }
-}
 
+    // bool insert_orb(int row, int col, char color)
+    // {
+    //     if (grid[row][col].get_color() != ' ' && grid[row][col].get_color() != color)
+    //     {
+    //         return false;
+    //     }
+    //     auto &cell = grid[row][col];
+    //     cell.set_orb_count(cell.get_orb_count() + 1);
+    //     cell.set_color(color);
+    //     if (cell.get_orb_count() >= get_critical_mass(row, col))
+    //     {
+    //         explode(row, col);
+    //     }
+    //     return true;
+    // }
+
+    void explode(int row, int col)
+    {
+        queue<pair<int, int>> explosion_queue;
+        explosion_queue.push({row, col});
+        grid[row][col].set_orb_count(0);
+        grid[row][col].set_color(' ');
+        int dx[4] = {-1, 0, 1, 0};
+        int dy[4] = {0, 1, 0, -1};
+        while (!explosion_queue.empty())
+        {
+            auto front = explosion_queue.front();
+            explosion_queue.pop();
+            int r = front.first;
+            int c = front.second;
+            for (int i = 0; i < 4; i++)
+            {
+                int new_row = r + dx[i];
+                int new_col = c + dy[i];
+                if (new_row >= 0 && new_row < rows && new_col >= 0 && new_col < cols)
+                {
+                    auto &neighbor_cell = grid[new_row][new_col];
+                    neighbor_cell.set_orb_count(neighbor_cell.get_orb_count() + 1);
+                    neighbor_cell.set_color(grid[r][c].get_color());
+                    if (neighbor_cell.get_orb_count() >= get_critical_mass(new_row, new_col))
+                    {
+                        explosion_queue.push({new_row, new_col});
+                        neighbor_cell.set_orb_count(0);
+                        neighbor_cell.set_color(' ');
+                    }
+                }
+            }
+        }
+    }
     vector<pair<int, int>> get_valid_moves(char color) const
     {
         vector<pair<int, int>> moves;

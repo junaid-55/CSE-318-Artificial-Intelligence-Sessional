@@ -91,7 +91,7 @@ class AI : public player
     }
 
 public:
-    AI(char color, int depth)
+    AI(char color, int depth = 4)
     {
         this->color = color;
         this->depth = depth;

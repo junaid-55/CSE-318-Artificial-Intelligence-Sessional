@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/workspaces/CSE-318-Artificial-Intelligence-Sessional/offline3/Engine/build')
+sys.path.append('../Engine/build')
 
 import Chain_reaction as cr
 
