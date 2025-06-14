@@ -1,4 +1,4 @@
-cd /workspaces/CSE-318-Artificial-Intelligence-Sessional/offline3/Engine/build
+cd /workspaces/CSE-318-Artificial-Intelligence-Sessional/offline3/Engine
 rm -rf *
 cd ..
 cmake -B build
