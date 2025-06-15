@@ -1,5 +1,3 @@
-cd /workspaces/CSE-318-Artificial-Intelligence-Sessional/offline3/Engine/build
-rm -rf *
-cd ..
-cmake -B build
-cmake --build build
+#!/bin/bash
+
+g++ -O3 -Wall -shared -std=c++11 $(python -m pybind11 --includes) bindings.cpp -o Chain_reaction.pyd
