@@ -1,16 +1,11 @@
 import pygame
 import sys
 import math
+import time
 from config import *
 from components import Button, Dropdown
 
-# Import C++ module
-sys.path.append('../Engine/build')
-import Chain_reaction as cr
-
-# Keep your existing MenuScreen class
-
-# GameScreen class that uses C++ module
+# GameScreen class that uses file communication
 class GameScreen:
     def __init__(self, screen, rows=5, cols=6):
         self.screen = screen
@@ -22,14 +17,12 @@ class GameScreen:
         self.grid_x = (WIDTH - self.grid_width) // 2
         self.grid_y = (HEIGHT - self.grid_height) // 2
         
-        # Game state
-        self.board = cr.Board(rows, cols)
-        self.players = {
-            'R': None,  # Will be set based on menu selection
-            'B': None   # Will be set based on menu selection
-        }
+        # Game state using 2D array instead of C++ board
+        self.board_data = [[{'orb_count': 0, 'color': ' '} for _ in range(cols)] for _ in range(rows)]
         self.current_color = 'R'  # Red starts
         self.turn = 0
+        self.game_over = False
+        self.winner = None
         
         # Initialize fonts
         self.font = pygame.font.Font(None, NORMAL_FONT_SIZE)
@@ -40,33 +33,109 @@ class GameScreen:
         self.back_button = Button(20, 20, "BACK", width=100, height=40, color=RED, hover_color=HOVER_RED)
         self.restart_button = Button(WIDTH - 120, 20, "RESTART", width=100, height=40, color=BLUE, hover_color=HOVER_BLUE)
     
-    def reset_grid(self,rows,cols):
+    def reset_grid(self, rows, cols):
         """Reset the game board to a new size"""
-        try:
-            self.board = cr.Board(rows, cols)
-            self.rows = rows
-            self.cols = cols
-            self.cell_size = min((WIDTH - 200) // cols, (HEIGHT - 200) // rows)
-            self.grid_width = self.cell_size * cols
-            self.grid_height = self.cell_size * rows
-            self.grid_x = (WIDTH - self.grid_width) // 2
-            self.grid_y = (HEIGHT - self.grid_height) // 2
-            print(f"Board reset to {rows}x{cols}")
-        except Exception as e:
-            print(f"Error resetting board: {e}")
+        self.rows = rows
+        self.cols = cols
+        self.board_data = [[{'orb_count': 0, 'color': ' '} for _ in range(cols)] for _ in range(rows)]
+        self.cell_size = min((WIDTH - 200) // cols, (HEIGHT - 200) // rows)
+        self.grid_width = self.cell_size * cols
+        self.grid_height = self.cell_size * rows
+        self.grid_x = (WIDTH - self.grid_width) // 2
+        self.grid_y = (HEIGHT - self.grid_height) // 2
+        self.game_over = False
+        self.winner = None
+        print(f"Board reset to {rows}x{cols}")
     
-    def set_players(self, player1_type, player2_type,ai_difficulty=3):
-        """Set player types based on menu selection"""
-        # Create player objects from C++ module
-        if player1_type == "Human":
-            self.players['R'] = cr.Human('R')
-        else:
-            self.players['R'] = cr.AI('R', ai_difficulty)  # AI with depth 2
+    def read_gamestate_file(self):
+        """Read gamestate from file and update board_data"""
+        try:
+            with open("../gamestate.txt", 'r') as f:
+                lines = f.readlines()
             
-        if player2_type == "Human":
-            self.players['B'] = cr.Human('B')
-        else:
-            self.players['B'] = cr.AI('B', ai_difficulty)  # AI with depth 3
+            if not lines:
+                return None
+                
+            header = lines[0].strip()
+            
+            # Parse board lines
+            for i in range(1, min(len(lines), self.rows + 1)):
+                row_data = lines[i].strip().split()
+                for j in range(min(len(row_data), self.cols)):
+                    cell = row_data[j]
+                    if cell == "0":
+                        self.board_data[i-1][j] = {'orb_count': 0, 'color': ' '}
+                    else:
+                        # Format: "nC" where n=orb count, C=color
+                        orb_count = int(cell[:-1])
+                        color = cell[-1]
+                        self.board_data[i-1][j] = {'orb_count': orb_count, 'color': color}
+            
+            return header
+            
+        except FileNotFoundError:
+            return None
+        except Exception as e:
+            print(f"Error reading gamestate: {e}")
+            return None
+    
+    def write_gamestate_file(self):
+        """Write current board state to file"""
+        try:
+            with open("../gamestate.txt", 'w') as f:
+                f.write("HUMAN MOVE:\n")
+                
+                for i in range(self.rows):
+                    row = []
+                    for j in range(self.cols):
+                        cell = self.board_data[i][j]
+                        if cell['color'] == ' ':
+                            row.append("0")
+                        else:
+                            row.append(f"{cell['orb_count']}{cell['color']}")
+                    f.write(" ".join(row) + "\n")
+            
+            print("Human move written to gamestate file")
+            
+        except Exception as e:
+            print(f"Error writing gamestate: {e}")
+    
+    def wait_for_ai_move(self):
+        """Wait for AI to make move and update board"""
+        print("Waiting for AI move...")
+        start_time = time.time()
+        
+        while time.time() - start_time < 10:  # 10 second timeout
+            header = self.read_gamestate_file()
+            if header == "AI MOVE:":
+                print("AI move received!")
+                self.check_game_over()
+                return True
+            time.sleep(0.1)
+        
+        print("Timeout waiting for AI move")
+        return False
+    
+    def check_game_over(self):
+        """Check if game is over"""
+        red_count = 0
+        blue_count = 0
+        
+        for i in range(self.rows):
+            for j in range(self.cols):
+                if self.board_data[i][j]['color'] == 'R':
+                    red_count += self.board_data[i][j]['orb_count']
+                elif self.board_data[i][j]['color'] == 'B':
+                    blue_count += self.board_data[i][j]['orb_count']
+        
+        # Game over if one player has no orbs (and it's not the first few turns)
+        if self.turn > 4:
+            if red_count == 0:
+                self.game_over = True
+                self.winner = 'B'
+            elif blue_count == 0:
+                self.game_over = True
+                self.winner = 'R'
     
     def get_cell_at_pos(self, pos):
         """Get the grid cell at the given screen position"""
@@ -100,11 +169,12 @@ class GameScreen:
             for col in range(self.cols):
                 cell_x = self.grid_x + col * self.cell_size
                 cell_y = self.grid_y + row * self.cell_size
-                cell_color = self.board.get_color(row, col)
-                orb_count = self.board.get_orb_count(row, col)
+                cell_data = self.board_data[row][col]
+                cell_color = cell_data['color']
+                orb_count = cell_data['orb_count']
                 
                 # Draw cell highlight for valid moves
-                if not self.board.is_game_over() and (cell_color == ' ' or cell_color == self.current_color):
+                if not self.game_over and (cell_color == ' ' or cell_color == self.current_color):
                     # Highlight the cell on hover
                     mouse_pos = pygame.mouse.get_pos()
                     cell_rect = pygame.Rect(cell_x, cell_y, self.cell_size, self.cell_size)
@@ -155,7 +225,7 @@ class GameScreen:
     def draw_player_info(self):
         """Draw player information and scores"""
         # Current player indicator
-        if not self.board.is_game_over():
+        if not self.game_over:
             player_text = "Red's Turn" if self.current_color == 'R' else "Blue's Turn"
             player_color = RED if self.current_color == 'R' else BLUE
         else:
@@ -166,9 +236,16 @@ class GameScreen:
         text_rect = text_surf.get_rect(center=(WIDTH // 2, 40))
         self.screen.blit(text_surf, text_rect)
         
-        # Score
-        red_score = self.board.get_score('R')
-        blue_score = self.board.get_score('B')
+        # Score calculation
+        red_score = 0
+        blue_score = 0
+        
+        for i in range(self.rows):
+            for j in range(self.cols):
+                if self.board_data[i][j]['color'] == 'R':
+                    red_score += self.board_data[i][j]['orb_count']
+                elif self.board_data[i][j]['color'] == 'B':
+                    blue_score += self.board_data[i][j]['orb_count']
         
         # Red player score
         red_text = f"Red: {red_score} orbs"
@@ -190,9 +267,9 @@ class GameScreen:
         self.screen.blit(turn_surf, turn_rect)
         
         # Winner
-        if self.board.is_game_over():
-            winner_color = RED if self.board.get_score('R') > 0 else BLUE
-            winner_text = "Red Wins!" if self.board.get_score('R') > 0 else "Blue Wins!"
+        if self.game_over and self.winner:
+            winner_color = RED if self.winner == 'R' else BLUE
+            winner_text = "Red Wins!" if self.winner == 'R' else "Blue Wins!"
             win_surf = self.title_font.render(winner_text, True, winner_color)
             win_rect = win_surf.get_rect(center=(WIDTH // 2, HEIGHT - 50))
             self.screen.blit(win_surf, win_rect)
@@ -209,43 +286,52 @@ class GameScreen:
         # Draw game elements
         self.draw_player_info()
         self.draw_grid()
+    
+    def make_human_move(self, row, col):
+        """Make human move and update file"""
+        if self.game_over:
+            return False
         
-        # Process AI moves if it's AI's turn
-        if not self.board.is_game_over():
-            player = self.players[self.current_color]
-            if isinstance(player, cr.AI):
-                player.make_move(self.board)
+        cell = self.board_data[row][col]
+        if cell['color'] == ' ' or cell['color'] == self.current_color:
+            # Add orb to cell
+            cell['orb_count'] += 1
+            cell['color'] = self.current_color
+            
+            # Write to file
+            self.write_gamestate_file()
+            
+            # Switch turn and wait for AI
+            self.current_color = 'B' if self.current_color == 'R' else 'R'
+            self.turn += 1
+            
+            # Wait for AI response
+            if self.wait_for_ai_move():
+                # Switch back to human turn
                 self.current_color = 'B' if self.current_color == 'R' else 'R'
                 self.turn += 1
+            
+            return True
+        return False
     
     def handle_cell_click(self, row, col):
         """Handle a click on a cell"""
-        if self.board.is_game_over():
+        if self.game_over:
             return False
-            
-        # Check if it's a human player's turn
-        player = self.players[self.current_color]
-        if isinstance(player, cr.Human):
-            # Make move using the C++ module
-            if self.board.get_color(row, col) == ' ' or self.board.get_color(row, col) == self.current_color:
-                try:
-                    self.board.insert_orb(row, col, self.current_color)
-                    self.current_color = 'B' if self.current_color == 'R' else 'R'
-                    self.turn += 1
-                    return True
-                except:
-                    return False
+        
+        # Only allow human moves when it's human turn
+        if self.current_color == 'R':  # Assuming human is always Red
+            return self.make_human_move(row, col)
         return False
     
     def reset_game(self):
-        try:
-            # Create a new board instance
-            self.board = cr.Board(self.rows, self.cols)
-            self.current_color = 'R'
-            self.turn = 0
-            print("Game reset successfully")
-        except Exception as e:
-            print(f"Error resetting game: {e}")
+        """Reset the game"""
+        self.board_data = [[{'orb_count': 0, 'color': ' '} for _ in range(self.cols)] for _ in range(self.rows)]
+        self.current_color = 'R'
+        self.turn = 0
+        self.game_over = False
+        self.winner = None
+        print("Game reset successfully")
     
     def handle_events(self, event):
         """Handle game-specific events"""
@@ -262,16 +348,14 @@ class GameScreen:
         
         # Handle game clicks
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if not self.board.is_game_over():
-                player = self.players[self.current_color]
-                if isinstance(player, cr.Human):
-                    row, col = self.get_cell_at_pos(event.pos)
-                    if row is not None and col is not None:
-                        self.handle_cell_click(row, col)
+            if not self.game_over:
+                row, col = self.get_cell_at_pos(event.pos)
+                if row is not None and col is not None:
+                    self.handle_cell_click(row, col)
         
-        # For any other event
         return {"action": None}
-    
+
+# Keep existing MenuScreen and SettingsScreen classes unchanged...
 class MenuScreen:
     def __init__(self, screen):
         self.screen = screen
@@ -353,7 +437,7 @@ class MenuScreen:
             return {"action": "quit"}
             
         return {"action": None}
-    
+
 class SettingsScreen:
     def __init__(self, screen):
         self.screen = screen

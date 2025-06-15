@@ -1,68 +1,97 @@
 import sys
 sys.path.append('../Engine/build')
-
 import Chain_reaction as cr
+import time
 
-def print_board(board):
-    for i in range(board.get_rows()):
-        for j in range(board.get_cols()):
-            cell_color = board.get_color(i, j)
-            orb_count = board.get_orb_count(i, j)
-            if cell_color != ' ':
-                print(f"{cell_color}{orb_count}", end=' ')
-            else:
-                print(".", end=' ')
-        print()
+def read_gamestate():
+    """Read gamestate file and return header and board lines"""
+    try:
+        with open("../gamestate.txt", 'r') as f:
+            lines = f.readlines()
+        
+        if not lines:
+            return None, None
+            
+        header = lines[0].strip()
+        board_lines = [line.strip() for line in lines[1:]]
+        return header, board_lines
+    except FileNotFoundError:
+        return None, None
+
+def parse_board_to_ai_board(board_lines, ai_board):
+    """Parse board lines and update AI board state"""
+    for i in range(min(len(board_lines), ai_board.get_rows())):
+        cells = board_lines[i].split()
+        for j in range(min(len(cells), ai_board.get_cols())):
+            cell = cells[j]
+            if cell != "0":
+                # Extract orb count and color from format like "2R" or "1B"
+                orb_count = int(cell[:-1])
+                color = cell[-1]
+                
+                # Set the cell state directly
+                for _ in range(orb_count):
+                    ai_board.insert_orb(i, j, color, True)  # force=True to set state
+
+def write_ai_move(ai_board):
+    """Write AI move result to gamestate file"""
+    with open("../gamestate.txt", 'w') as f:
+        f.write("AI MOVE:\n")
+        
+        for i in range(ai_board.get_rows()):
+            row = []
+            for j in range(ai_board.get_cols()):
+                color = ai_board.get_color(i, j)
+                if color == ' ':
+                    row.append("0")
+                else:
+                    orb_count = ai_board.get_orb_count(i, j)
+                    row.append(f"{orb_count}{color}")
+            f.write(" ".join(row) + "\n")
 
 def main():
-    ROWS, COLS = 5, 6  # Board size
-    board = cr.Board(ROWS, COLS)
-
-    player1 = cr.AI('R', 2)   # Player 1: AI, Red, depth 2
-    player2 = cr.AI('B', 3)   # Player 2: AI, Blue, depth 3
-
-    players = [player1, player2]
-    current_color = 'R'
-    turn = 0
-
-    while not board.is_game_over():
-        print(f"\nTurn {turn + 1}: Player {'1 (Red)' if current_color == 'R' else '2 (Blue)'}")
-
-        # Display board
-        print_board(board)
-
-        if current_color == 'R':
-            # Player 1 (AI) move
-            print("Red player's turn. AI will make a move.")
-            move_success = players[0].make_move(board, 0, 0)
-            if not move_success:
-                print("Invalid move! Try again.")
-                continue
-        else:
-            # Player 2 (AI) move
-            print("Blue player's turn. AI will make a move.")
-            move_success = players[1].make_move(board, 0, 0)
-            print("Player 2 (AI) made a move.")
-
-        # Switch turns
-        current_color = 'B' if current_color == 'R' else 'R'
-        turn += 1
-
-    # Final board display
-    print("\nFinal Board:")
-    for i in range(ROWS):
-        for j in range(COLS):
-            cell_color = board.get_color(i, j)
-            orb_count = board.get_score(cell_color)
-            if cell_color != ' ':
-                print(f"{cell_color}{orb_count}", end='\t')
+    """Main function - create AI and process moves"""
+    # Create AI player (Blue color, depth 3)
+    ai_player = cr.AI('B', 3)
+    
+    print("AI Backend started. Waiting for human moves...")
+    
+    while True:
+        header, board_lines = read_gamestate()
+        
+        if header == "HUMAN MOVE:":
+            print("Human move detected. Processing...")
+            
+            # Create fresh board with correct size
+            ai_board = cr.Board(5, 6)  # 5x6 board
+            
+            # Parse current board state
+            parse_board_to_ai_board(board_lines, ai_board)
+            
+            print("Current board state:")
+            for i in range(5):
+                for j in range(6):
+                    color = ai_board.get_color(i, j)
+                    if color != ' ':
+                        orb_count = ai_board.get_orb_count(i, j)
+                        print(f"{color}{orb_count}", end=' ')
+                    else:
+                        print(".", end=' ')
+                print()
+            
+            # AI makes its move
+            print("AI making move...")
+            success = ai_player.make_move(ai_board, 0, 0)
+            
+            if success:
+                print("AI move successful!")
+                # Write AI's board state back to file
+                write_ai_move(ai_board)
+                print("AI move written to gamestate file.")
             else:
-                print(".", end='\t')
-        print()
-
-    print("\nGame Over!")
-    winner = "1 (Red)" if board.get_score('R') > board.get_score('B') else "2 (Blue)"
-    print(f"Winner: Player {winner}")
+                print("AI move failed!")
+        
+        time.sleep(0.5)  # Check every 500ms
 
 if __name__ == "__main__":
     main()

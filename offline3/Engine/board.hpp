@@ -43,74 +43,78 @@ public:
         grid = other.grid;
     }
 
-    void insert_orb(int row, int col, char color, bool force = false)
-    {
-        queue<pair<int, int>> explosion_queue;
-        set<pair<int, int>> in_queue; // Track cells already in queue
-
-        explosion_queue.push({row, col});
-        in_queue.insert({row, col});
-
-        while (!explosion_queue.empty())
-        {
-            auto front = explosion_queue.front();
-            int r = front.first;
-            int c = front.second;
-            explosion_queue.pop();
-            in_queue.erase({r, c}); // Remove from tracking set
-
-            if (r < 0 || r >= rows || c < 0 || c >= cols)
-            {
-                continue;
-            }
-
-            Cell &cell = grid[r][c];
-            if (cell.get_color() == ' ' || cell.get_color() == color || force)
-            {
-                cell.set_orb_count(cell.get_orb_count() + 1);
-                cell.set_color(color);
-            }
-
-            if (cell.get_orb_count() >= get_critical_mass(r, c))
-            {
-                cell.set_orb_count(0);
-                cell.set_color(' ');
-
-                int dx[4] = {-1, 0, 1, 0};
-                int dy[4] = {0, 1, 0, -1};
-
-                for (int i = 0; i < 4; i++)
-                {
-                    int new_row = r + dx[i];
-                    int new_col = c + dy[i];
-                    pair<int, int> next_cell = {new_row, new_col};
-
-                    // Only add to queue if not already present
-                    if (in_queue.find(next_cell) == in_queue.end())
-                    {
-                        explosion_queue.push(next_cell);
-                        in_queue.insert(next_cell);
-                    }
-                }
-            }
-        }
-    }
-
-    // bool insert_orb(int row, int col, char color)
+    // void insert_orb(int row, int col, char color, bool force = false)
     // {
-    //     if (grid[row][col].get_color() != ' ' && grid[row][col].get_color() != color)
+    //     queue<pair<int, int>> explosion_queue;
+    //     set<pair<int, int>> in_queue; // Track cells already in queue
+
+    //     explosion_queue.push({row, col});
+    //     in_queue.insert({row, col});
+
+    //     while (!explosion_queue.empty())
     //     {
-    //         return false;
+    //         if(is_game_over())
+    //         {
+    //             return; 
+    //         }
+    //         auto front = explosion_queue.front();
+    //         int r = front.first;
+    //         int c = front.second;
+    //         explosion_queue.pop();
+    //         in_queue.erase({r, c});
+
+    //         if (r < 0 || r >= rows || c < 0 || c >= cols)
+    //         {
+    //             continue;
+    //         }
+
+    //         Cell &cell = grid[r][c];
+    //         if (cell.get_color() == ' ' || cell.get_color() == color || force)
+    //         {
+    //             cell.set_orb_count(cell.get_orb_count() + 1);
+    //             cell.set_color(color);
+    //         }
+
+    //         if (cell.get_orb_count() >= get_critical_mass(r, c))
+    //         {
+    //             cell.set_orb_count(0);
+    //             cell.set_color(' ');
+
+    //             int dx[4] = {-1, 0, 1, 0};
+    //             int dy[4] = {0, 1, 0, -1};
+
+    //             for (int i = 0; i < 4; i++)
+    //             {
+    //                 int new_row = r + dx[i];
+    //                 int new_col = c + dy[i];
+    //                 pair<int, int> next_cell = {new_row, new_col};
+
+    //                 // Only add to queue if not already present
+    //                 if (in_queue.find(next_cell) == in_queue.end())
+    //                 {
+    //                     explosion_queue.push(next_cell);
+    //                     in_queue.insert(next_cell);
+    //                 }
+    //             }
+    //         }
     //     }
-    //     auto &cell = grid[row][col];
-    //     cell.set_orb_count(cell.get_orb_count() + 1);
-    //     cell.set_color(color);
-    //     if (cell.get_orb_count() >= get_critical_mass(row, col))
-    //     {
-    //         explode(row, col);
-    //     }
-    //     return true;
     // }
+
+    bool insert_orb(int row, int col, char color)
+    {
+        if (grid[row][col].get_color() != ' ' && grid[row][col].get_color() != color)
+        {
+            return false;
+        }
+        auto &cell = grid[row][col];
+        cell.set_orb_count(cell.get_orb_count() + 1);
+        cell.set_color(color);
+        if (cell.get_orb_count() >= get_critical_mass(row, col))
+        {
+            explode(row, col);
+        }
+        return true;
+    }
 
     void explode(int row, int col)
     {
@@ -122,6 +126,10 @@ public:
         int dy[4] = {0, 1, 0, -1};
         while (!explosion_queue.empty())
         {
+            if(is_game_over())
+            {
+                return; 
+            }
             auto front = explosion_queue.front();
             explosion_queue.pop();
             int r = front.first;
