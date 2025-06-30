@@ -6,30 +6,36 @@
 #include <string>
 using namespace std;
 
-pair<string ,map<string,vector<string>>> parse(string csv){
+pair<string, vector<map<string, string>>> parse(string csv){
     vector<string> headers;
-    map<string, vector<string>> data;
+    vector<map<string, string>> data;
     string line;
     ifstream file(csv);
     if (!file.is_open()) {
         cerr << "Error opening file: " << csv << endl;
         return {"", {}};
     }
+    
+    // Read headers
     getline(file, line);
     stringstream ss(line);
     string header;
     while (getline(ss, header, ',')) {
         headers.push_back(header);
-        data[header] = vector<string>();
     }
+    
+    // Read data row by row
     while (getline(file, line)) {
         stringstream ss(line);
         string value;
-        for (const auto& header : headers) {
+        map<string, string> row;
+        
+        for (size_t i = 0; i < headers.size(); i++) {
             if (getline(ss, value, ',')) {
-                data[header].push_back(value);
+                row[headers[i]] = value;
             }
         }
+        data.push_back(row);
     }
     file.close();
     return {csv, data};
