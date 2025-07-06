@@ -1,3 +1,3 @@
 g++ tree.cpp -o test
-./test
+./test IG 3
 rm test
